@@ -68,7 +68,16 @@ class NGram(object):
  
         sent -- the sentence as a list of tokens.
         """
- 
+        p = 1
+        sent.append('</s>')
+        import ipdb; ipdb.set_trace()
+        for i in range(len(sent) - self.n + 1):
+            ngram = tuple(sent[i:i+self.n])
+            token = ngram[0]
+            prev_tokens = ngram[1:]
+            p = p * self.cond_prob(token, prev_tokens)
+        return p
+    
  
     def sent_log_prob(self, sent):
         """Log-probability of a sentence.
