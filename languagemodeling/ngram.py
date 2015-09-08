@@ -1,6 +1,7 @@
 # coding=utf-8
 # https://docs.python.org/3/library/collections.html
 from collections import defaultdict
+from math import log
 
 
 class NGram(object):
@@ -59,7 +60,6 @@ class NGram(object):
             prev_tokens = tuple()
         else:
             prev_tokens = tuple(prev_tokens)
-        #import ipdb; ipdb.set_trace()
         return float(self.count(prev_tokens + (token,)))/float(self.count(prev_tokens))
  
  
@@ -69,13 +69,15 @@ class NGram(object):
         sent -- the sentence as a list of tokens.
         """
         p = 1
-        sent.append('</s>')
-        import ipdb; ipdb.set_trace()
+        sent = ['<s>'] + sent + ['</s>']
         for i in range(len(sent) - self.n + 1):
             ngram = tuple(sent[i:i+self.n])
-            token = ngram[0]
-            prev_tokens = ngram[1:]
-            p = p * self.cond_prob(token, prev_tokens)
+            if ngram != ('<s>',):
+                token = ngram[len(ngram)-1]
+                prev_tokens = ngram[:len(ngram)-1]
+                p = p * self.cond_prob(token, prev_tokens)
+                if p == 0:
+                    break
         return p
     
  
@@ -84,3 +86,7 @@ class NGram(object):
  
         sent -- the sentence as a list of tokens.
         """
+        try:
+            return log(self.sent_prob(sent), 2)
+        except ValueError:
+            return float('-inf')
