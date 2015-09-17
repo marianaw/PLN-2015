@@ -3,6 +3,7 @@
 from collections import defaultdict
 from math import log
 from random import random
+from functools import reduce
 
 
 class NGram(object):
@@ -14,10 +15,12 @@ class NGram(object):
         """
         assert n > 0
         self.n = n
+        self.start_symbol = '<s>'
+        start_phrase = [self.start_symbol] * (self.n - 1)
         self.counts = counts = defaultdict(int)
 
         for sent in sents:
-            sent = ['<s>'] + sent + ['</s>']
+            sent = start_phrase + sent + ['</s>']
             for i in range(len(sent) - n + 1):
                 ngram = tuple(sent[i: i + n])
                 counts[ngram] += 1
@@ -38,12 +41,6 @@ class NGram(object):
         tokens -- the n-gram or (n-1)-gram tuple.
         """
         if tokens in self.counts.keys():
-            # Hardcodeo espantoso (no entiendo muy bien cómo funciona el <s>):
-            if tokens == ():
-                return self.counts[tokens]-2
-            if self.n == 1 and tokens == ('<s>',):
-                return 0
-
             return self.counts[tokens]
         else:
             return 0
@@ -66,15 +63,15 @@ class NGram(object):
         sent -- the sentence as a list of tokens.
         """
         p = 1
-        sent = ['<s>'] + sent + ['</s>']
+        start_phrase = [self.start_symbol] * (self.n - 1)
+        sent = start_phrase + sent + ['</s>']
         for i in range(len(sent) - self.n + 1):
             ngram = tuple(sent[i:i+self.n])
-            if ngram != ('<s>',):
-                token = ngram[len(ngram)-1]
-                prev_tokens = ngram[:len(ngram)-1]
-                p = p * self.cond_prob(token, prev_tokens)
-                if p == 0:
-                    break
+            token = ngram[len(ngram)-1]
+            prev_tokens = ngram[:len(ngram)-1]
+            p = p * self.cond_prob(token, prev_tokens)
+            if p == 0:
+                break
         return p
 
     def sent_log_prob(self, sent):
@@ -117,6 +114,7 @@ class NGramGenerator:
         model -- n-gram model.
         """
         self.n = model.n
+        self.start_symbol = model.start_symbol
         m = model.counts.keys()
         m = [y for y in m if len(y) >= model.n and y != ('<s>',)]
         l = map(lambda x: {x[:len(x)-1]: {x[len(x)-1]: model.cond_prob(x[len(x)-1], x[:len(x)-1])}}, m)
@@ -131,13 +129,13 @@ class NGramGenerator:
 
     def generate_sent(self):
         """Randomly generate a sentence."""
-        l = ['<s>']
+        l = [self.start_symbol] * (self.n - 1)
         s = ''
         while s != '</s>':
             prev = tuple(l[len(l)-(self.n-1):])
             s = self.generate_token(prev)
             l.append(s)
-        return l[1:len(l)-1]
+        return l[self.n-1:len(l)-1]
 
     def generate_token(self, prev_tokens=None):
         """Randomly generate a token, given prev_tokens.
