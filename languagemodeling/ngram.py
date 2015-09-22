@@ -33,7 +33,8 @@ class NGram(object):
         assert len(prev_tokens) == n - 1
 
         tokens = prev_tokens + [token]
-        return float(self.counts[tuple(tokens)])/self.counts[tuple(prev_tokens)]
+        return (float(self.counts[tuple(tokens)])/
+                self.counts[tuple(prev_tokens)])
 
     def count(self, tokens):
         """Count for an n-gram or (n-1)-gram.
@@ -79,10 +80,18 @@ class NGram(object):
 
         sent -- the sentence as a list of tokens.
         """
+        p = 0
+        start_phrase = [self.start_symbol] * (self.n - 1)
+        sent = start_phrase + sent + ['</s>']
         try:
-            return log(self.sent_prob(sent), 2)
+            for i in range(len(sent) - self.n + 1):
+                ngram = tuple(sent[i:i+self.n])
+                token = ngram[len(ngram)-1]
+                prev_tokens = ngram[:len(ngram)-1]
+                p += log(self.cond_prob(token, prev_tokens), 2)
         except ValueError:
             return float('-inf')
+        return p
 
 
 def merge_dicts(d, sd):
@@ -96,7 +105,7 @@ def merge_dicts(d, sd):
     Returns:
         A new merged dict.
     '''
-    skey = sd.keys()[0]
+    skey = list(sd.keys())[0]
     for key in d.keys():
         if skey == key:
             value = d[key]
@@ -152,3 +161,22 @@ class NGramGenerator:
             if u < aux:
                 return prob[0]
 
+
+class AddOneNGram(NGram):
+
+    def V(self):
+        vocabulary = set()
+        for key in self.counts.keys():
+            vocabulary = vocabulary.union(set(key))
+        return len(vocabulary.difference({self.start_symbol}))
+
+    def cond_prob(self, token, prev_tokens=None):
+        if prev_tokens is None:
+            prev_tokens = tuple()
+        else:
+            prev_tokens = tuple(prev_tokens)
+        #import ipdb; ipdb.set_trace()
+        num = float(self.count(prev_tokens + (token,))+1)
+        den = float(self.count(prev_tokens))+self.V()
+        return num/den
+        
