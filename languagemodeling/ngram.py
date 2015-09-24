@@ -4,6 +4,7 @@ from collections import defaultdict
 from math import log
 from random import random
 from functools import reduce
+from sklearn.cross_validation import train_test_split
 
 
 class NGram(object):
@@ -56,6 +57,7 @@ class NGram(object):
             prev_tokens = tuple()
         else:
             prev_tokens = tuple(prev_tokens)
+        import ipdb; ipdb.set_trace()
         return float(self.count(prev_tokens + (token,)))/float(self.count(prev_tokens))
 
     def sent_prob(self, sent):
@@ -80,6 +82,7 @@ class NGram(object):
 
         sent -- the sentence as a list of tokens.
         """
+        #import ipdb; ipdb.set_trace()
         p = 0
         start_phrase = [self.start_symbol] * (self.n - 1)
         sent = start_phrase + sent + ['</s>']
@@ -92,6 +95,31 @@ class NGram(object):
         except ValueError:
             return float('-inf')
         return p
+    
+    def log_prob(self, text):
+        p = 0
+        m = 0
+        for sent in text:
+            p += self.sent_log_prob(sent)
+            m += len(sent)
+        return p/float(m + len(text))
+        
+    def entropy(self, sents):
+        """
+        Computes entropy of the sentences.
+
+        sent -- the sentence which entropy is to be calculated.
+        """
+        p = self.log_prob(sents)
+        return -p
+
+    def perplexity(self, sent):
+        """
+        Computes perplexity of a sentence.
+
+        sent -- the sentence which perplexity is to be calculated.
+        """
+        return pow(2.0, self.entropy(sent))
 
 
 def merge_dicts(d, sd):
@@ -180,3 +208,77 @@ class AddOneNGram(NGram):
         den = float(self.count(prev_tokens))+self.V()
         return num/den
         
+        
+class InterpolatedNGram(NGram):
+ 
+    def __init__(self, n, sents, gamma=None, addone=True):
+        """
+        n -- order of the model.
+        sents -- list of sentences, each one being a list of tokens.
+        gamma -- interpolation hyper-parameter (if not given, estimate using
+            held-out data).
+        addone -- whether to use addone smoothing (default: True).
+        """
+        self.n = n
+        if gamma is None:
+            train, ho = train_test_split(sents, train_size=0.9)
+            self.gamma = self.compute_gamma(ho)
+        else:
+            train = sents
+            self.gamma = gamma
+        self.start_symbol = '<s>'
+        start_phrase = [self.start_symbol] * (self.n - 1)
+        self.counts = counts = defaultdict(int)
+        self.addone = addone
+        
+        for sent in train:
+            sent = start_phrase + sent + ['</s>']
+            for i in range(len(sent) - n + 1):
+                ngram = tuple(sent[i: i + n])
+                for j in range(n+1):
+                    counts[ngram[0:j]] += 1
+        counts[('</s>',)] = len(train)    
+                    
+    def V(self):
+        vocabulary = set()
+        for key in self.counts.keys():
+            vocabulary = vocabulary.union(set(key))
+        return len(vocabulary.difference({self.start_symbol}))
+    
+    def l(self, i, ngram, current_sum):
+        if i == self.n:
+            return 1-current_sum
+        else:
+            return (1 - current_sum) * self.count(ngram)/(self.count(ngram) + self.gamma)
+    
+    def compute_gamma(self, ho):
+        gammas = [1.0, 5.0, 10.0, 50.0, 100.0]
+        candidates = []
+        #import ipdb; ipdb.set_trace()
+        train, test = train_test_split(ho, train_size=0.8)
+        for g in gammas:
+            ng = InterpolatedNGram(self.n, train, g, False)
+            candidates.append(ng.perplexity(test))
+        return max(candidates)
+    
+    def cond_prob(self, token, prev_tokens=None): #FIXME: usar addone para evitar las divisiones por cero, ¿está bien esto?
+        p = 0
+        current_sum = 0
+        if prev_tokens is None:
+            prev_tokens = tuple()
+        prev_tokens = tuple(prev_tokens)
+        for i in range(self.n):
+            lambda_i = self.l(i+1, prev_tokens[i:], current_sum)
+            current_sum += lambda_i
+            #import ipdb; ipdb.set_trace()
+            numerator = self.count(prev_tokens[i:]+(token,))
+            denominator = self.count(prev_tokens[i:])
+            if self.addone and len(prev_tokens[i:]) == 0:
+                numerator = numerator + 1.0
+                denominator += self.V()
+            
+            p += lambda_i * (numerator/denominator)
+        return p
+    
+    
+            
