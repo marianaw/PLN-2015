@@ -57,7 +57,6 @@ class NGram(object):
             prev_tokens = tuple()
         else:
             prev_tokens = tuple(prev_tokens)
-        import ipdb; ipdb.set_trace()
         return float(self.count(prev_tokens + (token,)))/float(self.count(prev_tokens))
 
     def sent_prob(self, sent):
@@ -231,6 +230,7 @@ class InterpolatedNGram(NGram):
         self.counts = counts = defaultdict(int)
         self.addone = addone
         
+        #import ipdb; ipdb.set_trace()
         for sent in train:
             sent = start_phrase + sent + ['</s>']
             for i in range(len(sent) - n + 1):
@@ -254,8 +254,9 @@ class InterpolatedNGram(NGram):
     def compute_gamma(self, ho):
         gammas = [1.0, 5.0, 10.0, 50.0, 100.0]
         candidates = []
-        #import ipdb; ipdb.set_trace()
-        train, test = train_test_split(ho, train_size=0.8)
+        train, test = train_test_split(ho, train_size=0.9)
+        if len(train) == 0 or len(test) == 0:
+            return gammas[0] #FIXME: ¡Consultar esto!
         for g in gammas:
             ng = InterpolatedNGram(self.n, train, g, False)
             candidates.append(ng.perplexity(test))
@@ -277,7 +278,8 @@ class InterpolatedNGram(NGram):
                 numerator = numerator + 1.0
                 denominator += self.V()
             
-            p += lambda_i * (numerator/denominator)
+            if lambda_i != 0:
+                p += lambda_i * (numerator/denominator)
         return p
     
     
