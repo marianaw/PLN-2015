@@ -206,8 +206,8 @@ class AddOneNGram(NGram):
         num = float(self.count(prev_tokens + (token,))+1)
         den = float(self.count(prev_tokens))+self.V()
         return num/den
-        
-        
+
+
 class InterpolatedNGram(NGram):
  
     def __init__(self, n, sents, gamma=None, addone=True):
@@ -220,7 +220,7 @@ class InterpolatedNGram(NGram):
         """
         self.n = n
         if gamma is None:
-            train, ho = train_test_split(sents, train_size=0.9)
+            train, ho = train_test_split(sents, train_size=0.9) #NOTE: al usar train_test_split a veces pasa el test held_out, ¡¡¡y a veces no!!!
             self.gamma = self.compute_gamma(ho)
         else:
             train = sents
@@ -282,5 +282,116 @@ class InterpolatedNGram(NGram):
                 p += lambda_i * (numerator/denominator)
         return p
     
+
+class BackOffNGram(NGram):
+ 
+    def __init__(self, n, sents, beta=None, addone=True):
+        """
+        Back-off NGram model with discounting as described by Michael Collins.
+ 
+        n -- order of the model.
+        sents -- list of sentences, each one being a list of tokens.
+        beta -- discounting hyper-parameter (if not given, estimate using
+            held-out data).
+        addone -- whether to use addone smoothing (default: True).
+        """
+        self.n = n
+        if beta is None:
+            train, ho = train_test_split(sents, train_size=0.9)
+            self.beta = self.compute_beta(ho)
+        else:
+            train = sents
+            self.beta = beta
+        self.start_symbol = '<s>'
+        start_phrase = [self.start_symbol] * (self.n - 1)
+        self.counts = counts = defaultdict(int)
+        self.addone = addone
+        
+        #import ipdb; ipdb.set_trace()
+        for sent in train:
+            sent = start_phrase + sent + ['</s>']
+            for i in range(len(sent) - n + 1):
+                ngram = tuple(sent[i: i + n])
+                for j in range(n+1):
+                    counts[ngram[0:j]] += 1
+        counts[('</s>',)] = len(train)    
+ 
+    """
+       Todos los métodos de NGram.
+    """
     
-            
+    def compute_beta(self, ho):
+        betas = [0.1, 0.2, 0.4, 0.5]
+        candidates = []
+        train, test = train_test_split(ho, train_size=0.9)
+        if len(train) == 0 or len(test) == 0:
+            return betas[0] #FIXME: ¡Consultar esto!
+        for beta in betas:
+            ng = InterpolatedNGram(self.n, train, beta, self.addone)
+            candidates.append(ng.perplexity(test))
+        return max(candidates)
+
+    def A(self, tokens):
+        """Set of words with counts > 0 for a k-gram with 0 < k < n.
+ 
+        tokens -- the k-gram tuple.
+        """
+        s = set()
+        m = len(tokens)
+        for item in self.counts.keys():
+            if len(item) == m + 1:
+                if item[0:m] == tokens:
+                    s = s.union({item[m]})
+        return s
+ 
+    def alpha(self, tokens):
+        """Missing probability mass for a k-gram with 0 < k < n.
+ 
+        tokens -- the k-gram tuple.
+        """
+        s = sum([self.count(tokens + (item,)) - self.beta for item in self.A(tokens)])
+        if s == 0:
+            return 1
+        return 1 - s/float(self.count(tokens))
+
+    def V(self):
+        vocabulary = set()
+        for key in self.counts.keys():
+            vocabulary = vocabulary.union(set(key))
+        return len(vocabulary.difference({self.start_symbol}))
+
+    def cond_prob(self, token, prev_tokens=None):
+        if prev_tokens == () or prev_tokens is None:
+            return self.count((token,))/self.count(())
+        #if prev_tokens is None:
+            #prev_tokens = tuple()
+        prev_tokens = tuple(prev_tokens)
+        gram = prev_tokens + (token,)
+        numerator = self.count(gram)
+        denominator = self.count(prev_tokens)
+        if len(gram) == 1:
+            if self.addone:
+                numerator += 1
+                denominator += self.V()
+            return numerator/denominator
+        #import ipdb; ipdb.set_trace()
+        if token in self.A(prev_tokens):
+            return float(numerator - self.beta)/denominator
+        else:
+            alpha = self.alpha(prev_tokens)
+            if alpha == 0:
+                return 0
+            else:
+                prob = alpha * (self.cond_prob(token, prev_tokens[1:])/self.denom(prev_tokens))
+                return prob
+
+    def denom(self, tokens):
+        """Normalization factor for a k-gram with 0 < k < n.
+ 
+        tokens -- the k-gram tuple.
+        """
+        s = 1
+        #import ipdb; ipdb.set_trace()
+        for w in self.A(tokens):
+            s -= self.cond_prob(w, tokens[1:])
+        return s    
