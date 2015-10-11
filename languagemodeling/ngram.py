@@ -81,7 +81,6 @@ class NGram(object):
 
         sent -- the sentence as a list of tokens.
         """
-        #import ipdb; ipdb.set_trace()
         p = 0
         start_phrase = [self.start_symbol] * (self.n - 1)
         sent = start_phrase + sent + ['</s>']
@@ -112,13 +111,13 @@ class NGram(object):
         p = self.log_prob(sents)
         return -p
 
-    def perplexity(self, sent):
+    def perplexity(self, sents):
         """
-        Computes perplexity of a sentence.
+        Computes perplexity of a text.
 
-        sent -- the sentence which perplexity is to be calculated.
+        sents -- the text which perplexity is to be calculated.
         """
-        return pow(2.0, self.entropy(sent))
+        return pow(2.0, self.entropy(sents))
 
 
 def merge_dicts(d, sd):
@@ -149,6 +148,7 @@ class NGramGenerator:
         """
         model -- n-gram model.
         """
+        #import ipdb; ipdb.set_trace()
         self.n = model.n
         self.start_symbol = model.start_symbol
         m = model.counts.keys()
@@ -264,6 +264,7 @@ class InterpolatedNGram(NGram):
     
     def cond_prob(self, token, prev_tokens=None): #FIXME: usar addone para evitar las divisiones por cero, ¿está bien esto?
         p = 0
+        #import ipdb;ipdb.set_trace()
         current_sum = 0
         if prev_tokens is None:
             prev_tokens = tuple()
@@ -296,6 +297,7 @@ class BackOffNGram(NGram):
         addone -- whether to use addone smoothing (default: True).
         """
         self.n = n
+        self.addone = addone
         if beta is None:
             train, ho = train_test_split(sents, train_size=0.9)
             self.beta = self.compute_beta(ho)
@@ -305,7 +307,6 @@ class BackOffNGram(NGram):
         self.start_symbol = '<s>'
         start_phrase = [self.start_symbol] * (self.n - 1)
         self.counts = counts = defaultdict(int)
-        self.addone = addone
         
         #import ipdb; ipdb.set_trace()
         for sent in train:
@@ -321,13 +322,14 @@ class BackOffNGram(NGram):
     """
     
     def compute_beta(self, ho):
+        #import ipdb; ipdb.set_trace()
         betas = [0.1, 0.2, 0.4, 0.5]
         candidates = []
         train, test = train_test_split(ho, train_size=0.9)
         if len(train) == 0 or len(test) == 0:
             return betas[0] #FIXME: ¡Consultar esto!
         for beta in betas:
-            ng = InterpolatedNGram(self.n, train, beta, self.addone)
+            ng = BackOffNGram(self.n, train, beta, self.addone)
             candidates.append(ng.perplexity(test))
         return max(candidates)
 
@@ -361,10 +363,11 @@ class BackOffNGram(NGram):
         return len(vocabulary.difference({self.start_symbol}))
 
     def cond_prob(self, token, prev_tokens=None):
-        if prev_tokens == () or prev_tokens is None:
-            return self.count((token,))/self.count(())
-        #if prev_tokens is None:
-            #prev_tokens = tuple()
+        #import ipdb; ipdb.set_trace()
+        #if prev_tokens == () or prev_tokens is None:
+            #return self.count((token,))/self.count(())
+        if prev_tokens is None:
+            prev_tokens = tuple()
         prev_tokens = tuple(prev_tokens)
         gram = prev_tokens + (token,)
         numerator = self.count(gram)
@@ -382,8 +385,10 @@ class BackOffNGram(NGram):
             if alpha == 0:
                 return 0
             else:
-                prob = alpha * (self.cond_prob(token, prev_tokens[1:])/self.denom(prev_tokens))
-                return prob
+                d = self.denom(prev_tokens)
+                if len(prev_tokens) > 0 and d > 0:
+                    prob = alpha * (self.cond_prob(token, prev_tokens[1:])/d)
+                    return prob
 
     def denom(self, tokens):
         """Normalization factor for a k-gram with 0 < k < n.
@@ -395,3 +400,11 @@ class BackOffNGram(NGram):
         for w in self.A(tokens):
             s -= self.cond_prob(w, tokens[1:])
         return s    
+    
+#if __name__ == '__main__':
+    #from sklearn.cross_validation import train_test_split
+    #sents = ['la gata come pescado .'.split(), 'el gato come salmón .'.split(), 'el canario come semillas .'.split()]
+    #train, test = train_test_split(sents, train_size=0.9)
+    #ng = BackOffNGram(3, train, beta=0.4)
+    #c = ng.cond_prob('lala')
+    #print(c)
