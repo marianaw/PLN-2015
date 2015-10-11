@@ -12,7 +12,7 @@ Options:
 """
 from docopt import docopt
 from corpus_reader import corpus
-from languagemodeling.ngram import NGram, AddOneNGram
+from languagemodeling.ngram import NGram, AddOneNGram, InterpolatedNGram, BackOffNGram
 import pickle
 
 from nltk.corpus import gutenberg
@@ -21,10 +21,11 @@ if __name__ == '__main__':
     opts = docopt(__doc__)
 
     # load the data
-    text = gutenberg.raw('austen-emma.txt')
-    sents = corpus(text)
+    #text = gutenberg.raw('austen-emma.txt')
+    f = open('../../model.txt')    
+    sents = corpus(' '.join(f.readlines()))
     
-      # train the model
+    # train the model
     n = int(opts['-n'])
     
     try:
@@ -36,6 +37,10 @@ if __name__ == '__main__':
         model = NGram(n, sents)
     if m == 'addone':
         model = AddOneNGram(n, sents)
+    if m == 'interp':
+        model = InterpolatedNGram(n, sents)
+    if m == 'backoff':
+        model = BackOffNGram(n, sents, beta=0.4)
 
     # save it
     filename = opts['-o']

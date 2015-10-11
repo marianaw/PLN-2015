@@ -14,15 +14,19 @@ from docopt import docopt
 import pickle
 
 from nltk.corpus import gutenberg
+from corpus_reader import corpus
 
-from languagemodeling.ngram import NGram
+from languagemodeling.ngram import NGram, AddOneNGram
+   
 
 
 if __name__ == '__main__':
     opts = docopt(__doc__)
 
     # load the data
-    sents = gutenberg.sents('austen-emma.txt')
+    #sents = gutenberg.sents('austen-emma.txt')
+    f = open('../../model.txt')    
+    sents = corpus(' '.join(f.readlines()))
 
     # train the model
     n = int(opts['-n'])
