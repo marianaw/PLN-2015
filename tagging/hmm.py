@@ -112,24 +112,52 @@ class HMM:
                 p += log2(self.out_prob(word, y[i]))
         except ValueError:
             return float('-inf')
-        return p * self.tag_prob(y)
+        return p + log2(self.tag_prob(y))
 
     def tag(self, sent):
         """Returns the most probable tagging for a sentence.
  
         sent -- the sentence.
         """
- 
- 
+        pass
+
 class ViterbiTagger:
  
     def __init__(self, hmm):
         """
         hmm -- the HMM.
         """
+        self.hmm = hmm
  
     def tag(self, sent):
         """Returns the most probable tagging for a sentence.
  
         sent -- the sentence.
         """
+        n = self.hmm.n
+        d = {}
+        tags = tuple(['<s>'] * (self.hmm.n -1))
+        #import ipdb; ipdb.set_trace()
+        for k in range(len(sent)+1):
+            if k == 0:
+                aux = {tags : (0.0, [])}
+                d[0] = aux
+            else:
+                aux = {}
+                m = max(d[k-1].values(), key=lambda x: x[0])
+                max_prob = m[0]
+                max_tags = m[1]
+                tags += tuple(max_tags)
+                prev_tags = tags[len(tags) - (n - 1):]
+                trans = self.hmm.trans[prev_tags]
+                for tag in trans.keys():
+                    tag_ngram = prev_tags + (tag,)
+                    trans_prob = self.hmm.trans_prob(tag, prev_tags)
+                    word = sent[k - 1]
+                    word_prob = self.hmm.out_prob(word, tag)
+                    aux.update({tag_ngram[1:]: (max_prob + log2(trans_prob) + log2(word_prob), max_tags + [tag])})
+                d.update({k: aux})
+        self._pi = d
+        last_dict = d[len(sent)]
+        max_prob = max(last_dict.values(), key=lambda x: x[0])
+        return max_prob[1]
