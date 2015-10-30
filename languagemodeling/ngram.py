@@ -19,13 +19,15 @@ class NGram(object):
         self.start_symbol = '<s>'
         start_phrase = [self.start_symbol] * (self.n - 1)
         self.counts = counts = defaultdict(int)
-
+        vocab = set()
         for sent in sents:
             sent = start_phrase + sent + ['</s>']
             for i in range(len(sent) - n + 1):
                 ngram = tuple(sent[i: i + n])
                 counts[ngram] += 1
                 counts[ngram[:-1]] += 1
+            vocab = vocab.union(set(sent))
+        self.voc_size = len(vocab)
 
     def prob(self, token, prev_tokens=None):
         n = self.n
@@ -192,10 +194,7 @@ class NGramGenerator:
 class AddOneNGram(NGram):
 
     def V(self):
-        vocabulary = set()
-        for key in self.counts.keys():
-            vocabulary = vocabulary.union(set(key))
-        return len(vocabulary.difference({self.start_symbol}))
+        return self.voc_size
 
     def cond_prob(self, token, prev_tokens=None):
         if prev_tokens is None:
@@ -204,7 +203,7 @@ class AddOneNGram(NGram):
             prev_tokens = tuple(prev_tokens)
         #import ipdb; ipdb.set_trace()
         num = float(self.count(prev_tokens + (token,))+1)
-        den = float(self.count(prev_tokens))+self.V()
+        den = float(self.count(prev_tokens)) + self.V()
         return num/den
 
 
@@ -237,13 +236,14 @@ class InterpolatedNGram(NGram):
                 ngram = tuple(sent[i: i + n])
                 for j in range(n+1):
                     counts[ngram[0:j]] += 1
-        counts[('</s>',)] = len(train)    
+        counts[('</s>',)] = len(train)
+        #self.voc_size = self.V()
                     
-    def V(self):
-        vocabulary = set()
-        for key in self.counts.keys():
-            vocabulary = vocabulary.union(set(key))
-        return len(vocabulary.difference({self.start_symbol}))
+    #def V(self):
+        #vocabulary = set()
+        #for key in self.counts.keys():
+            #vocabulary = vocabulary.union(set(key))
+        #return len(vocabulary.difference({self.start_symbol}))
     
     def l(self, i, ngram, current_sum):
         if i == self.n:
@@ -277,7 +277,7 @@ class InterpolatedNGram(NGram):
             denominator = self.count(prev_tokens[i:])
             if self.addone and len(prev_tokens[i:]) == 0:
                 numerator = numerator + 1.0
-                denominator += self.V()
+                denominator += self.voc_size
             
             if lambda_i != 0:
                 p += lambda_i * (numerator/denominator)
@@ -298,6 +298,7 @@ class BackOffNGram(NGram):
         """
         self.n = n
         self.addone = addone
+        self.denominator = {}
         if beta is None:
             train, ho = train_test_split(sents, train_size=0.9)
             self.beta = self.compute_beta(ho)
@@ -307,7 +308,6 @@ class BackOffNGram(NGram):
         self.start_symbol = '<s>'
         start_phrase = [self.start_symbol] * (self.n - 1)
         self.counts = counts = defaultdict(int)
-        
         #import ipdb; ipdb.set_trace()
         for sent in train:
             sent = start_phrase + sent + ['</s>']
@@ -316,6 +316,7 @@ class BackOffNGram(NGram):
                 for j in range(n+1):
                     counts[ngram[0:j]] += 1
         counts[('</s>',)] = len(train)    
+        #self.voc_size = self.V()
  
     """
        Todos los métodos de NGram.
@@ -363,9 +364,6 @@ class BackOffNGram(NGram):
         return len(vocabulary.difference({self.start_symbol}))
 
     def cond_prob(self, token, prev_tokens=None):
-        #import ipdb; ipdb.set_trace()
-        #if prev_tokens == () or prev_tokens is None:
-            #return self.count((token,))/self.count(())
         if prev_tokens is None:
             prev_tokens = tuple()
         prev_tokens = tuple(prev_tokens)
@@ -375,9 +373,8 @@ class BackOffNGram(NGram):
         if len(gram) == 1:
             if self.addone:
                 numerator += 1
-                denominator += self.V()
+                denominator += self.voc_size
             return numerator/denominator
-        #import ipdb; ipdb.set_trace()
         if token in self.A(prev_tokens):
             return float(numerator - self.beta)/denominator
         else:
@@ -395,11 +392,16 @@ class BackOffNGram(NGram):
  
         tokens -- the k-gram tuple.
         """
+        
         s = 1
         #import ipdb; ipdb.set_trace()
-        for w in self.A(tokens):
-            s -= self.cond_prob(w, tokens[1:])
-        return s    
+        if tokens in self.denominator.keys():
+            return self.denominator[tokens]
+        else:
+            for w in self.A(tokens):
+                s -= self.cond_prob(w, tokens[1:])
+            self.denominator[tokens] = s
+            return s
     
 #if __name__ == '__main__':
     #from sklearn.cross_validation import train_test_split
