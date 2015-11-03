@@ -119,7 +119,9 @@ class HMM:
  
         sent -- the sentence.
         """
-        pass
+        vt = ViterbiTagger(self)
+        return vt.tag(sent)
+        
 
 class ViterbiTagger:
  
