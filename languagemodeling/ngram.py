@@ -27,7 +27,7 @@ class NGram(object):
                 counts[ngram] += 1
                 counts[ngram[:-1]] += 1
             vocab = vocab.union(set(sent))
-        self.voc_size = len(vocab)
+        self.voc_size = len(vocab) - 1
 
     def prob(self, token, prev_tokens=None):
         n = self.n
@@ -228,7 +228,7 @@ class InterpolatedNGram(NGram):
         start_phrase = [self.start_symbol] * (self.n - 1)
         self.counts = counts = defaultdict(int)
         self.addone = addone
-        
+        vocab = set()
         #import ipdb; ipdb.set_trace()
         for sent in train:
             sent = start_phrase + sent + ['</s>']
@@ -236,8 +236,9 @@ class InterpolatedNGram(NGram):
                 ngram = tuple(sent[i: i + n])
                 for j in range(n+1):
                     counts[ngram[0:j]] += 1
+            vocab = vocab.union(set(sent))
+        self.voc_size = len(vocab) - 1
         counts[('</s>',)] = len(train)
-        #self.voc_size = self.V()
                     
     #def V(self):
         #vocabulary = set()
@@ -308,15 +309,18 @@ class BackOffNGram(NGram):
         self.start_symbol = '<s>'
         start_phrase = [self.start_symbol] * (self.n - 1)
         self.counts = counts = defaultdict(int)
-        #import ipdb; ipdb.set_trace()
+        vocab = set()
         for sent in train:
             sent = start_phrase + sent + ['</s>']
             for i in range(len(sent) - n + 1):
                 ngram = tuple(sent[i: i + n])
                 for j in range(n+1):
                     counts[ngram[0:j]] += 1
+            vocab = vocab.union(set(sent))
+        self.voc_size = len(vocab) - 1
         counts[('</s>',)] = len(train)    
-        #self.voc_size = self.V()
+        self.lala = {}
+        self.jisd = {}
  
     """
        Todos los métodos de NGram.
@@ -339,29 +343,38 @@ class BackOffNGram(NGram):
  
         tokens -- the k-gram tuple.
         """
-        s = set()
-        m = len(tokens)
-        for item in self.counts.keys():
-            if len(item) == m + 1:
-                if item[0:m] == tokens:
-                    s = s.union({item[m]})
-        return s
+        if tokens in self.lala.keys():
+            return self.lala[tokens]
+        else:
+            s = set()
+            m = len(tokens)
+            for item in self.counts.keys():
+                if len(item) == m + 1:
+                    if item[0:m] == tokens:
+                        s = s.union({item[m]})
+            self.lala[tokens] = s
+            return s
  
     def alpha(self, tokens):
         """Missing probability mass for a k-gram with 0 < k < n.
  
         tokens -- the k-gram tuple.
         """
-        s = sum([self.count(tokens + (item,)) - self.beta for item in self.A(tokens)])
-        if s == 0:
-            return 1
-        return 1 - s/float(self.count(tokens))
+        if tokens in self.jisd.keys():
+            return self.jisd[tokens]
+        else:
+            s = sum([self.count(tokens + (item,)) - self.beta for item in self.A(tokens)])
+            if s == 0:
+                return 1
+            result = 1 - s/float(self.count(tokens))
+            self.jisd[tokens] = result
+            return result
 
-    def V(self):
-        vocabulary = set()
-        for key in self.counts.keys():
-            vocabulary = vocabulary.union(set(key))
-        return len(vocabulary.difference({self.start_symbol}))
+    #def V(self):
+        #vocabulary = set()
+        #for key in self.counts.keys():
+            #vocabulary = vocabulary.union(set(key))
+        #return len(vocabulary.difference({self.start_symbol}))
 
     def cond_prob(self, token, prev_tokens=None):
         if prev_tokens is None:
