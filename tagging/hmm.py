@@ -140,6 +140,7 @@ class ViterbiTagger:
         n = self.hmm.n
         d = {}
         tags = tuple(['<s>'] * (self.hmm.n -1))
+        m = (0.0, [])
         #import ipdb; ipdb.set_trace()
         for k in range(len(sent)+1):
             if k == 0:
@@ -147,19 +148,33 @@ class ViterbiTagger:
                 d[0] = aux
             else:
                 aux = {}
-                m = max(d[k-1].values(), key=lambda x: x[0])
+                #print(d[k-1].values())
+                #m = max(d[k-1].values(), key=lambda x: x[0])
                 max_prob = m[0]
                 max_tags = m[1]
                 tags += tuple(max_tags)
                 prev_tags = tags[len(tags) - (n - 1):]
-                trans = self.hmm.trans[prev_tags]
-                for tag in trans.keys():
-                    tag_ngram = prev_tags + (tag,)
-                    trans_prob = self.hmm.trans_prob(tag, prev_tags)
-                    word = sent[k - 1]
+                word = sent[k - 1]
+                tagset = self.hmm.tagset()
+                for tag in tagset:
                     word_prob = self.hmm.out_prob(word, tag)
-                    aux.update({tag_ngram[1:]: (max_prob + log2(trans_prob) + log2(word_prob), max_tags + [tag])})
+                    if word_prob != 0:
+                        tag_ngram = prev_tags + (tag,)
+                        trans_prob = self.hmm.trans_prob(tag, prev_tags)
+                        if trans_prob > 0:
+                            aux.update({tag_ngram[1:]: (max_prob + log2(trans_prob) + log2(word_prob), max_tags + [tag])})
+                print(aux)
+                m = max(aux.values(), key=lambda x: x[0])
                 d.update({k: aux})
+                
+                #trans = self.hmm.trans[prev_tags]
+                #for tag in trans.keys():
+                    #tag_ngram = prev_tags + (tag,)
+                    #trans_prob = self.hmm.trans_prob(tag, prev_tags)
+                    #word = sent[k - 1]
+                    #word_prob = self.hmm.out_prob(word, tag)
+                    #aux.update({tag_ngram[1:]: (max_prob + log2(trans_prob) + log2(word_prob), max_tags + [tag])})
+                #d.update({k: aux})
         self._pi = d
         last_dict = d[len(sent)]
         max_prob = max(last_dict.values(), key=lambda x: x[0])
@@ -180,7 +195,7 @@ class MLHMM(HMM):
         self.start_symbol = '<s>'
         self.counts = counts = defaultdict(int)
         tags = []
-        self.words = words = set()
+        words = set()
         start_phrase = [self.start_symbol] * (n - 1)
         for sent in tagged_sents:
             tag_seq = [t for w, t in sent]
@@ -193,9 +208,14 @@ class MLHMM(HMM):
             tags += tag_seq
             words = words.union(set([w for w, t in sent]))
         tagged = [t for  sent in tagged_sents for t in sent]
+        self.words = words
+        self.tags = set(tags).difference({self.start_symbol, '</s>'})
         self.tag_word_pair_count = dict((x, tagged.count(x)) for x in set(tagged))
         self.every_tag_count = dict((x, tags.count(x)) for x in set(tags))
         self.voc_size = len(words)
+        
+    def tagset(self):
+        return self.tags
  
     def tcount(self, tokens):
         """Count for an n-gram or (n-1)-gram of tags.
@@ -239,6 +259,9 @@ class MLHMM(HMM):
         """
         if self.unknown(word):
             return 1/float(self.voc_size)
-        num = float(self.tag_word_pair_count[(word, tag)])
-        den = float(self.every_tag_count[tag])
+        try:
+            num = float(self.tag_word_pair_count[(word, tag)])
+            den = float(self.every_tag_count[tag])
+        except KeyError:
+            return 0
         return num/den
