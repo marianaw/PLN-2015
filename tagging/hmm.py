@@ -205,7 +205,6 @@ class MLHMM(HMM):
                 ngram = tuple(tag_seq[i: i + n])
                 counts[ngram] += 1
                 counts[ngram[:-1]] += 1
-            tags += tag_seq
             words = words.union(set([w for w, t in sent]))
         tagged = [t for  sent in tagged_sents for t in sent]
         self.words = words
