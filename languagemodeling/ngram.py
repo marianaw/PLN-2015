@@ -44,9 +44,9 @@ class NGram(object):
 
         tokens -- the n-gram or (n-1)-gram tuple.
         """
-        if tokens in self.counts.keys():
+        try:
             return self.counts[tokens]
-        else:
+        except KeyError:
             return 0
 
     def cond_prob(self, token, prev_tokens=None):
@@ -237,15 +237,10 @@ class InterpolatedNGram(NGram):
                 for j in range(n+1):
                     counts[ngram[0:j]] += 1
             vocab = vocab.union(set(sent))
-        self.voc_size = len(vocab) - 1
+        vocab = vocab.difference({'<s>'})
+        self.voc_size = len(vocab)
         counts[('</s>',)] = len(train)
-                    
-    #def V(self):
-        #vocabulary = set()
-        #for key in self.counts.keys():
-            #vocabulary = vocabulary.union(set(key))
-        #return len(vocabulary.difference({self.start_symbol}))
-    
+
     def l(self, i, ngram, current_sum):
         if i == self.n:
             return 1-current_sum
@@ -299,7 +294,12 @@ class BackOffNGram(NGram):
         """
         self.n = n
         self.addone = addone
+        
+        #Diccionarios para guardar cómputos parciales:
         self.denominator = {}
+        self.ases = defaultdict(set)
+        self.alphas = {}
+
         if beta is None:
             train, ho = train_test_split(sents, train_size=0.9)
             self.beta = self.compute_beta(ho)
@@ -316,11 +316,13 @@ class BackOffNGram(NGram):
                 ngram = tuple(sent[i: i + n])
                 for j in range(n+1):
                     counts[ngram[0:j]] += 1
+                    if j < n:
+                        self.ases[ngram[0:j]].add(ngram[j])
             vocab = vocab.union(set(sent))
-        self.voc_size = len(vocab) - 1
-        counts[('</s>',)] = len(train)    
-        self.lala = {}
-        self.jisd = {}
+        vocab = vocab.difference({'<s>'})
+        self.voc_size = len(vocab)
+        self.vocab = vocab
+        counts[('</s>',)] = len(train)
  
     """
        Todos los métodos de NGram.
@@ -343,38 +345,32 @@ class BackOffNGram(NGram):
  
         tokens -- the k-gram tuple.
         """
-        if tokens in self.lala.keys():
-            return self.lala[tokens]
-        else:
-            s = set()
-            m = len(tokens)
-            for item in self.counts.keys():
-                if len(item) == m + 1:
-                    if item[0:m] == tokens:
-                        s = s.union({item[m]})
-            self.lala[tokens] = s
-            return s
+        try:
+            return self.ases[tokens]
+        except KeyError:
+            for word in self.vocab:
+                gram = tokens + (word,)
+                if self.count(gram) > 0:
+                    self.ases[tokens].add(word)
+            return self.ases[tokens]
  
     def alpha(self, tokens):
         """Missing probability mass for a k-gram with 0 < k < n.
  
         tokens -- the k-gram tuple.
         """
-        if tokens in self.jisd.keys():
-            return self.jisd[tokens]
+        if tokens in self.alphas.keys():
+            return self.alphas[tokens]
         else:
-            s = sum([self.count(tokens + (item,)) - self.beta for item in self.A(tokens)])
-            if s == 0:
+            tok_alpha = len(self.A(tokens))
+            if tok_alpha == 0:
                 return 1
-            result = 1 - s/float(self.count(tokens))
-            self.jisd[tokens] = result
-            return result
-
-    #def V(self):
-        #vocabulary = set()
-        #for key in self.counts.keys():
-            #vocabulary = vocabulary.union(set(key))
-        #return len(vocabulary.difference({self.start_symbol}))
+            alf = (tok_alpha * self.beta)/self.count(tokens)
+            self.alphas[tokens] = alf
+            #s = sum([self.count(tokens + (item,)) - self.beta for item in tok_alpha])
+            #result = 1 - s/float(self.count(tokens))
+            #self.alphas[tokens] = result  #FIXME: ¡¡¡ Notar que 1 - sum(count(tokens + (w,))/count(tokens)) = |A(tokens)|*beta / count(tokens) !!!
+            return alf
 
     def cond_prob(self, token, prev_tokens=None):
         if prev_tokens is None:
@@ -387,9 +383,12 @@ class BackOffNGram(NGram):
             if self.addone:
                 numerator += 1
                 denominator += self.voc_size
-            return numerator/denominator
-        if token in self.A(prev_tokens):
-            return float(numerator - self.beta)/denominator
+            prob = numerator/denominator
+            return prob
+        prev_tok_alpha = self.A(prev_tokens)
+        if token in prev_tok_alpha:
+            prob = float(numerator - self.beta)/denominator
+            return prob
         else:
             alpha = self.alpha(prev_tokens)
             if alpha == 0:
@@ -405,21 +404,22 @@ class BackOffNGram(NGram):
  
         tokens -- the k-gram tuple.
         """
-        
         s = 1
         #import ipdb; ipdb.set_trace()
         if tokens in self.denominator.keys():
             return self.denominator[tokens]
         else:
-            for w in self.A(tokens):
+            tok_alpha = self.A(tokens)
+            for w in tok_alpha:
                 s -= self.cond_prob(w, tokens[1:])
             self.denominator[tokens] = s
             return s
     
-#if __name__ == '__main__':
-    #from sklearn.cross_validation import train_test_split
-    #sents = ['la gata come pescado .'.split(), 'el gato come salmón .'.split(), 'el canario come semillas .'.split()]
-    #train, test = train_test_split(sents, train_size=0.9)
-    #ng = BackOffNGram(3, train, beta=0.4)
-    #c = ng.cond_prob('lala')
-    #print(c)
+if __name__ == '__main__':
+    from nltk.corpus import gutenberg
+    from pickle import load
+    train = gutenberg.sents(gutenberg.fileids()[1:])
+    test = gutenberg.sents(gutenberg.fileids()[0])
+    ng = load(open('backoff_3_gram_not_working', 'rb'))
+    p = ng.perplexity(test)
+    print(p)
