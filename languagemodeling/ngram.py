@@ -415,11 +415,11 @@ class BackOffNGram(NGram):
             self.denominator[tokens] = s
             return s
     
-if __name__ == '__main__':
-    from nltk.corpus import gutenberg
-    from pickle import load
-    train = gutenberg.sents(gutenberg.fileids()[1:])
-    test = gutenberg.sents(gutenberg.fileids()[0])
-    ng = load(open('backoff_3_gram_not_working', 'rb'))
-    p = ng.perplexity(test)
-    print(p)
+#if __name__ == '__main__':
+    #from nltk.corpus import gutenberg
+    #from pickle import load
+    #train = gutenberg.sents(gutenberg.fileids()[1:])
+    #test = gutenberg.sents(gutenberg.fileids()[0])
+    #ng = load(open('backoff_3_gram_not_working', 'rb'))
+    #p = ng.perplexity(test)
+    #print(p)
