@@ -37,10 +37,14 @@ class CKYParser:
                 s = max_parent[0]
                 pi[(i, i)][s] = max_parent[1]
                 bp[(i, i)][s] = Tree(s, [w])
-        
+
         for l in range(1, n):
             for i in range(1, n-l+1):
                 j = i + l
+                if pi[(i,j)]:
+                    pass
+                if bp[(i,j)]:
+                    pass
                 for s in range(i, j):
                     left_pi = pi[(i, s)]
                     right_pi = pi[(s + 1, j)]
@@ -49,8 +53,6 @@ class CKYParser:
                             prob = left_prob + right_prob
                             rule = (parent_left, parent_right)
                             p_dict = pp[rule]
-                            if not pi[(i,j)]:
-                                pi[(i,j)] = defaultdict(dict)
                             for grand_parent, grand_prob in p_dict.items():
                                 prob = prob + grand_prob
                                 if len(pi[(i,j)][grand_parent]) == 0:
