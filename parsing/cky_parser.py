@@ -55,7 +55,7 @@ class CKYParser:
                             p_dict = pp[rule]
                             for grand_parent, grand_prob in p_dict.items():
                                 prob = prob + grand_prob
-                                if len(pi[(i,j)][grand_parent]) == 0:
+                                if len(pi[(i,j)]) == 0:
                                     pi[(i,j)][grand_parent] = float('-inf') #Para la primera vez.
                                 if prob > pi[(i,j)][grand_parent]: #FIXME: ¡Para la primera vez dará un type error!
                                     pi[(i,j)][grand_parent] = prob
@@ -63,8 +63,7 @@ class CKYParser:
                                                                     [bp[(i, s)][parent_left],
                                                                     bp[s+1, j][parent_right]])
         self._pi = pi
-        self._bp = dict(bp)
-        self._bp2 =bp
+        self._bp = bp
         try:
             return pi[(1, n)][self.start], bp[(1, n)][self.start]
         except KeyError:
