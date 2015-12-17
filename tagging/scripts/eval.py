@@ -79,6 +79,7 @@ if __name__ == '__main__':
     unk_acc = float(unk_hits)/total_unk
     kno_acc = float(hits - unk_hits)/(total - total_unk)
     confusion = pd.DataFrame.from_dict(confusion)
+    confusion = confusion.fillna(0)
     
     print('')
     print('Accuracy: {:2.2f}%'.format(acc * 100))
