@@ -11,6 +11,8 @@ Options:
 from docopt import docopt
 import pickle
 import sys
+from collections import defaultdict
+import pandas as pd
 
 from corpus.ancora import SimpleAncoraCorpusReader
 
@@ -21,6 +23,7 @@ def progress(msg, width=None):
         width = len(msg)
     print('\b' * width + msg, end='')
     sys.stdout.flush()
+
 
 
 if __name__ == '__main__':
@@ -40,8 +43,9 @@ if __name__ == '__main__':
     # tag
     hits, total = 0, 0
     unk_hits, total_unk = 0, 0
-    kno_hits, total_kno = 0, 0
     n = len(sents)
+    nested_dict = lambda: defaultdict(int)
+    confusion = defaultdict(nested_dict)
     for i, sent in enumerate(sents):
         word_sent, gold_tag_sent = zip(*sent)
 
@@ -65,17 +69,20 @@ if __name__ == '__main__':
         unk_acc = float(unk_hits)/total_unk
         progress('{:3.1f}% ({:2.2f}%)'.format(float(i) * 100 / n, unk_acc * 100))
         
-        known_hits_sent = [g == m for w, g, m in words_mod_gold if w in model.words]
-        kno_hits += sum(known_hits_sent)
-        total_kno += len(word_sent) - len(unk_words)
-        kno_acc = float(kno_hits)/total_kno
-        progress('{:3.1f}% ({:2.2f}%)'.format(float(i) * 100 / n, kno_acc * 100))
+        #Confusion matrix as a dictionary:
+        mod_gold = zip(gold_tag_sent, model_tag_sent)
+        for gt, mt in mod_gold:
+            if gt != mt:
+                confusion[gt][mt] += 1
 
     acc = float(hits) / total
     unk_acc = float(unk_hits)/total_unk
-    kno_acc = float(kno_hits)/total_kno
-
+    kno_acc = float(hits - unk_hits)/(total - total_unk)
+    confusion = pd.DataFrame.from_dict(confusion)
+    
     print('')
     print('Accuracy: {:2.2f}%'.format(acc * 100))
     print('Accuracy unknown words: {:2.2f}%'.format(unk_acc * 100))
     print('Accuracy known words: {:2.2f}%'.format(kno_acc * 100))
+    print('Confusion matrix:')
+    print(confusion.ix[:15, :15])
