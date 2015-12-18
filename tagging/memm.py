@@ -5,10 +5,15 @@ from sklearn.svm import LinearSVC
 from sklearn.pipeline import Pipeline
 from tagging.features import *
 
+models = {
+    'multinomial': MultinomialNB,
+    'logistic': LogisticRegression,
+    'linearsvc': LinearSVC
+    }
 
 class MEMM:
  
-    def __init__(self, n, tagged_sents): #Acá tengo que crear el pipeline (¡mirar la documentación!). Básicamente: pipeline = [(vector de features, clasificador)]
+    def __init__(self, n, tagged_sents, model='multinomial'): #Acá tengo que crear el pipeline (¡mirar la documentación!). Básicamente: pipeline = [(vector de features, clasificador)]
         """
         n -- order of the model.
         tagged_sents -- list of sentences, each one being a list of pairs.
@@ -17,8 +22,9 @@ class MEMM:
         self.n = n
         w = []
         for tagged_sent in tagged_sents:
-            words, tags = zip(*tagged_sent)
-            w.extend(list(words))
+            if len(tagged_sent) > 0:
+                words, tags = zip(*tagged_sent)
+                w.extend(list(words))
         self.words = w
         histories = self.sents_histories(tagged_sents)
         #TODO: aplicar cada función feature en las histories que tenemos. v = Vectorizer([some_feature, some_other_feature])
@@ -33,12 +39,12 @@ class MEMM:
             prevword_features.append(PrevWord(feature))
         features.extend(prevtags_features + prevword_features)
         features_vector = Vectorizer(features)
-        mnb = MultinomialNB()
+        mnb = models[model]()
         self.pipeline = Pipeline([('vectorizer', features_vector),
                                   ('classifier', mnb)])
         self.pipeline.fit(self.sents_histories(tagged_sents),
                           self.sents_tags(tagged_sents))
- 
+
     def sents_histories(self, tagged_sents):
         """
         Iterator over the histories of a corpus.
@@ -47,7 +53,8 @@ class MEMM:
         """
         histories = []
         for tagged_sent in tagged_sents:
-            histories.extend(self.sent_histories(tagged_sent))
+            if len(tagged_sent) > 0:
+                histories.extend(self.sent_histories(tagged_sent))
         return histories
 
     def sent_histories(self, tagged_sent):
@@ -72,7 +79,8 @@ class MEMM:
         """
         tags = []
         for tagged_sent in tagged_sents:
-            tags.extend(self.sent_tags(tagged_sent))
+            if len(tagged_sent) > 0:
+                tags.extend(self.sent_tags(tagged_sent))
         return tags
 
     def sent_tags(self, tagged_sent):

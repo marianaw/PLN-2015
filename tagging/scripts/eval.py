@@ -86,4 +86,4 @@ if __name__ == '__main__':
     print('Accuracy unknown words: {:2.2f}%'.format(unk_acc * 100))
     print('Accuracy known words: {:2.2f}%'.format(kno_acc * 100))
     print('Confusion matrix:')
-    print(confusion.ix[:15, :15])
+    print(confusion.ix[:10, :10])

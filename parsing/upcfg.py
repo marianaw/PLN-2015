@@ -1,8 +1,8 @@
 from nltk.tree import Tree
 from nltk.grammar import Nonterminal as N, ProbabilisticProduction, Production, PCFG
 from collections import Counter
-from parsing.cky_parser import CKYParser
-from parsing.util import lexicalize
+from .cky_parser import CKYParser
+from .util import lexicalize
 
 class UPCFG:
     """Unlexicalized PCFG.
@@ -14,8 +14,7 @@ class UPCFG:
         """
         counts_prods = []
         counts_lefts = []
-        start_symbol = parsed_sents[0].label()
-        self.start_symbol = start_symbol
+        self.start = start
         for sent in parsed_sents:
             copy_sent = sent
             #if horzMarkov is not None:
@@ -49,7 +48,7 @@ class UPCFG:
                                                      [left],
                                                      prob=p))
         self.prods = prods
-        pcfg = PCFG(N(start_symbol), prods)
+        pcfg = PCFG(N(start), prods)
         self.parser = CKYParser(pcfg)
 
     def productions(self):
@@ -66,6 +65,6 @@ class UPCFG:
         #import ipdb; ipdb.set_trace()
         _, tree = self.parser.parse(list(t))
         if len(tree) == 0:
-            return Tree(self.start_symbol, [Tree(tag, [word]) for word, tag in tagged_sent])#FIXME: dejar tag como string.
+            return Tree(self.start, [Tree(tag, [word]) for word, tag in tagged_sent])#FIXME: dejar tag como string.
         else:
             return lexicalize(tree, w)

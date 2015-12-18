@@ -1,5 +1,5 @@
 from math import log
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 log2 = lambda x: log(x, 2)
 
@@ -163,7 +163,7 @@ class ViterbiTagger:
                         trans_prob = self.hmm.trans_prob(tag, prev_tags)
                         if trans_prob > 0:
                             aux.update({tag_ngram[1:]: (max_prob + log2(trans_prob) + log2(word_prob), max_tags + [tag])})
-                print(aux)
+
                 m = max(aux.values(), key=lambda x: x[0])
                 d.update({k: aux})
                 
@@ -181,6 +181,35 @@ class ViterbiTagger:
         return max_prob[1]
 
 
+    #def __init__(self, n, tagged_sents, addone=True):
+        #"""
+        #n -- order of the model.
+        #tagged_sents -- training sentences, each one being a list of pairs.
+        #addone -- whether to use addone smoothing (default: True).
+        #"""
+        #self.n = n
+        #self.addone = addone
+        #self.start_symbol = '<s>'
+        #self.counts = counts = defaultdict(int)
+        #tags = []
+        #words = set()
+        #start_phrase = [self.start_symbol] * (n - 1)
+        #for sent in tagged_sents:
+            #tag_seq = [t for w, t in sent]
+            #tags += tag_seq
+            #tag_seq = start_phrase + tag_seq + ['</s>']
+            #for i in range(len(tag_seq) - n + 1):
+                #ngram = tuple(tag_seq[i: i + n])
+                #counts[ngram] += 1
+                #counts[ngram[:-1]] += 1
+            #words = words.union(set([w for w, t in sent])) #CUELLO DE BOTELLA.
+        #tagged = [t for  sent in tagged_sents for t in sent]
+        #self.words = words
+        #self.tags = set(tags).difference({self.start_symbol, '</s>'})
+        #self.tag_word_pair_count = dict((x, tagged.count(x)) for x in set(tagged)) #FIXME: ¡A esto lo hace Count! CUELLO DE BOTELLA AQUÍ.
+        #self.every_tag_count = dict((x, tags.count(x)) for x in set(tags)) #¡Esto también!
+        #self.voc_size = len(words)
+
 
 class MLHMM(HMM):
  
@@ -195,23 +224,29 @@ class MLHMM(HMM):
         self.start_symbol = '<s>'
         self.counts = counts = defaultdict(int)
         tags = []
-        words = set()
+        words = []
         start_phrase = [self.start_symbol] * (n - 1)
+
         for sent in tagged_sents:
-            tag_seq = [t for w, t in sent]
-            tags += tag_seq
-            tag_seq = start_phrase + tag_seq + ['</s>']
-            for i in range(len(tag_seq) - n + 1):
-                ngram = tuple(tag_seq[i: i + n])
-                counts[ngram] += 1
-                counts[ngram[:-1]] += 1
-            words = words.union(set([w for w, t in sent]))
+            if len(sent) > 0:
+                ws, tag_seq = zip(*sent)
+                ws = list(ws)
+                tag_seq = list(tag_seq)
+                tags.extend(tag_seq)
+                words.extend(ws)
+                tag_seq = start_phrase + tag_seq + ['</s>']
+                for i in range(len(tag_seq) - n + 1):
+                    ngram = tuple(tag_seq[i: i + n])
+                    counts[ngram] += 1
+                    counts[ngram[:-1]] += 1
+            
         tagged = [t for  sent in tagged_sents for t in sent]
-        self.words = words
+        self.words = set(words)
         self.tags = set(tags).difference({self.start_symbol, '</s>'})
-        self.tag_word_pair_count = dict((x, tagged.count(x)) for x in set(tagged))
-        self.every_tag_count = dict((x, tags.count(x)) for x in set(tags))
-        self.voc_size = len(words)
+        self.tag_word_pair_count = Counter(tagged)
+        self.every_tag_count = Counter(tags)
+        self.voc_size = len(self.words)
+
         
     def tagset(self):
         return self.tags

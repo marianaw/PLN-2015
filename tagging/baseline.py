@@ -2,7 +2,7 @@
 from collections import Counter, defaultdict
 
 
-#def merge(d, sd):
+#def merge(d, sd): #FIXME: esto no tiene ningún sentido, hace todo más lento.
     #skey= list(sd.keys())[0]
     #dk = d.keys()
     #for key in dk:
